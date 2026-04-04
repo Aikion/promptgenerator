@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Generator</title>
+    <style>
+        :root {
+            --primary: #7c3aed;
+            --primary-light: #8b5cf6;
+            --primary-glow: rgba(124,58,237,0.25);
+            --bg: #09090b;
+            --surface: #18181b;
+            --surface2: #27272a;
+            --border: #3f3f46;
+            --text: #fafafa;
+            --text-muted: #a1a1aa;
+            --text-subtle: #71717a;
+            --success: #22c55e;
+            --radius: 10px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        /* HEADER */
+        header {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #1e1b4b 100%);
+            border-bottom: 1px solid #3730a3;
+            padding: 28px 20px;
+            text-align: center;
+        }
+        .header-badge {
+            display: inline-block;
+            background: rgba(124,58,237,0.3);
+            border: 1px solid rgba(124,58,237,0.5);
+            color: #c4b5fd;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 3px 12px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+        header h1 {
+            font-size: clamp(24px, 5vw, 34px);
+            font-weight: 800;
+            background: linear-gradient(135deg, #a78bfa, #67e8f9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 6px;
+        }
+        header p { color: #c4b5fd; font-size: 14px; opacity: 0.8; }
+
+        /* LAYOUT */
+        main { max-width: 740px; margin: 0 auto; padding: 24px 16px 60px; }
+
+        /* CARD */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+        }
+        .card-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        /* TEXTAREA */
+        textarea {
+            width: 100%;
+            min-height: 110px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.65;
+            padding: 13px 15px;
+            resize: vertical;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+        textarea::placeholder { color: var(--text-subtle); }
+
+        /* OPTIONS GRID */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 13px;
+            margin-top: 16px;
+        }
+        @media (max-width: 480px) { .options-grid { grid-template-columns: 1fr; } }
+
+        .option-group { display: flex; flex-direction: column; gap: 5px; }
+
+        label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+        }
+        select {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font-size: 14px;
+            padding: 9px 32px 9px 12px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%2371717a' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 11px center;
+            width: 100%;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        select:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        /* ADVANCED TOGGLE */
+        .advanced-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: var(--text-subtle);
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+            transition: color 0.2s;
+            user-select: none;
+        }
+        .advanced-toggle:hover { color: var(--text-muted); }
+        .chevron { font-size: 9px; transition: transform 0.25s; display: inline-block; }
+        .advanced-toggle.open .chevron { transform: rotate(180deg); }
+        .advanced-options { display: none; }
+        .advanced-options.open { display: block; padding-top: 14px; }
+
+        /* GENERATE BUTTON */
+        .generate-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 15px;
+            font-weight: 700;
+            padding: 14px 24px;
+            cursor: pointer;
+            margin-top: 18px;
+            transition: transform 0.15s, box-shadow 0.15s;
+            letter-spacing: 0.02em;
+        }
+        .generate-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 28px rgba(124,58,237,0.45);
+        }
+        .generate-btn:active { transform: translateY(0); }
+
+        /* ERROR */
+        .error-msg {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 8px;
+            padding: 9px 13px;
+            color: #fca5a5;
+            font-size: 13px;
+            margin-top: 10px;
+            display: none;
+        }
+        .error-msg.visible { display: block; }
+
+        /* RESULT CARD */
+        .result-card { display: none; animation: slideUp 0.3s ease; }
+        .result-card.visible { display: block; }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .result-title { font-size: 14px; font-weight: 700; }
+        .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+        .badge {
+            font-size: 11px; font-weight: 600;
+            padding: 3px 9px; border-radius: 20px;
+        }
+        .badge-purpose {
+            background: rgba(124,58,237,0.15);
+            border: 1px solid rgba(124,58,237,0.4);
+            color: #c4b5fd;
+        }
+        .badge-tool {
+            background: rgba(6,182,212,0.12);
+            border: 1px solid rgba(6,182,212,0.35);
+            color: #67e8f9;
+        }
+
+        .prompt-output {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            font-size: 14px;
+            line-height: 1.75;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 80px;
+        }
+
+        .result-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 13px;
+        }
+        .char-count { font-size: 12px; color: var(--text-subtle); }
+        .result-actions { display: flex; gap: 8px; }
+
+        .btn {
+            font-size: 13px; font-weight: 600;
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            background: var(--surface2);
+            color: var(--text);
+            transition: background 0.15s;
+        }
+        .btn:hover { background: var(--border); }
+        .btn-copy {
+            background: rgba(34,197,94,0.12);
+            border-color: rgba(34,197,94,0.35);
+            color: #4ade80;
+        }
+        .btn-copy:hover { background: rgba(34,197,94,0.22); }
+        .btn-copy.copied { background: rgba(34,197,94,0.25); }
+
+        /* TIP BOX */
+        .tip {
+            background: rgba(6,182,212,0.07);
+            border: 1px solid rgba(6,182,212,0.22);
+            border-radius: 8px;
+            padding: 11px 14px;
+            font-size: 13px;
+            color: #7dd3fc;
+            margin-top: 14px;
+            display: none;
+        }
+        .tip.visible { display: block; }
+
+        /* FOOTER */
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-subtle);
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-badge">KI Werkzeug</div>
+    <h1>✨ Prompt Generator</h1>
+    <p>Aus deiner Idee wird ein professioneller KI-Prompt</p>
+</header>
+
+<main>
+    <div class="card">
+        <div class="card-title">✏️ &nbsp;Deine Anfrage</div>
+
+        <textarea id="userInput" rows="5"
+            placeholder="Beschreibe einfach in eigenen Worten, was du möchtest...&#10;&#10;Beispiele:&#10;• Ein Astronaut tanzt auf dem Mond&#10;• Schreibe mir eine E-Mail an meinen Chef wegen Urlaub&#10;• Erstelle einen Instagram Post über gesunde Ernährung"></textarea>
+
+        <div class="error-msg" id="errorMsg">Bitte beschreibe zuerst deine Anfrage oben.</div>
+
+        <div class="options-grid">
+            <div class="option-group">
+                <label for="purpose">Zweck</label>
+                <select id="purpose" onchange="onPurposeChange()">
+                    <option value="allgemein">💬 Allgemein / Recherche</option>
+                    <option value="bild">🖼️ Bild</option>
+                    <option value="video">🎬 Video</option>
+                    <option value="text">📝 Text / Artikel</option>
+                    <option value="code">💻 Code</option>
+                    <option value="social">📱 Social Media</option>
+                    <option value="email">📧 E-Mail</option>
+                    <option value="praesentation">📊 Präsentation</option>
+                </select>
+            </div>
+            <div class="option-group">
+                <label for="tool">KI-Tool</label>
+                <select id="tool"></select>
+            </div>
+            <div class="option-group">
+                <label for="style" id="styleLabel">Stil</label>
+                <select id="style"></select>
+            </div>
+            <div class="option-group">
+                <label for="language">Ausgabesprache</label>
+                <select id="language">
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="en">🇬🇧 Englisch</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="advanced-toggle" id="advToggle" onclick="toggleAdvanced()">
+            <span class="chevron" id="chevron">▼</span>
+            Erweiterte Optionen
+        </div>
+        <div class="advanced-options" id="advOptions">
+            <div class="options-grid" id="advGrid"></div>
+        </div>
+
+        <button class="generate-btn" onclick="generate()">✨ &nbsp;Prompt generieren</button>
+    </div>
+
+    <div class="card result-card" id="resultCard">
+        <div class="result-header">
+            <div class="result-title">🎯 Generierter Prompt</div>
+            <div class="badges">
+                <span class="badge badge-purpose" id="badgePurpose"></span>
+                <span class="badge badge-tool" id="badgeTool"></span>
+            </div>
+        </div>
+        <div class="prompt-output" id="promptOutput"></div>
+        <div class="result-footer">
+            <span class="char-count" id="charCount"></span>
+            <div class="result-actions">
+                <button class="btn" onclick="resetForm()">↺ &nbsp;Neu</button>
+                <button class="btn btn-copy" id="copyBtn" onclick="copyPrompt()">📋 &nbsp;Kopieren</button>
+            </div>
+        </div>
+        <div class="tip" id="tipBox"></div>
+    </div>
+</main>
+
+<footer>Prompt Generator v1.0 · AiKiOn Akademie</footer>
+
+<script>
+// ── DATA ────────────────────────────────────────────────────
+
+const TOOLS = {
+    allgemein:    [{v:'chatgpt',l:'ChatGPT'},{v:'claude',l:'Claude'},{v:'gemini',l:'Gemini'},{v:'perplexity',l:'Perplexity'},{v:'copilot',l:'Copilot'}],
+    bild:         [{v:'midjourney',l:'Midjourney'},{v:'dalle',l:'DALL-E 3 (ChatGPT)'},{v:'stable',l:'Stable Diffusion'},{v:'firefly',l:'Adobe Firefly'},{v:'ideogram',l:'Ideogram'},{v:'flux',l:'Flux'},{v:'nanobanana',l:'Nano Banana 2'},{v:'gemini3pro',l:'Gemini 3 Pro Image'}],
+    video:        [{v:'sora',l:'Sora (OpenAI)'},{v:'runway',l:'Runway ML'},{v:'kling',l:'Kling'},{v:'pika',l:'Pika'},{v:'hailuo',l:'Hailuo'},{v:'googleveo',l:'Google Veo 3.0'}],
+    text:         [{v:'chatgpt',l:'ChatGPT'},{v:'claude',l:'Claude'},{v:'gemini',l:'Gemini'},{v:'copilot',l:'Copilot'}],
+    code:         [{v:'chatgpt',l:'ChatGPT'},{v:'claude',l:'Claude'},{v:'copilot',l:'GitHub Copilot'},{v:'cursor',l:'Cursor'},{v:'gemini',l:'Gemini'}],
+    social:       [{v:'chatgpt',l:'ChatGPT'},{v:'claude',l:'Claude'},{v:'gemini',l:'Gemini'}],
+    email:        [{v:'chatgpt',l:'ChatGPT'},{v:'claude',l:'Claude'},{v:'gemini',l:'Gemini'}],
+    praesentation:[{v:'chatgpt',l:'ChatGPT'},{v:'claude',l:'Claude'},{v:'gamma',l:'Gamma.app'},{v:'gemini',l:'Gemini'}],
+};
+
+const STYLES = {
+    allgemein:    [{v:'frage',l:'Frage / Unterstützung'},{v:'recherche',l:'Recherche'},{v:'brainstorming',l:'Brainstorming'},{v:'analyse',l:'Analyse'},{v:'strategie',l:'Strategieberatung'}],
+    bild:         [{v:'fotorealistisch',l:'Fotorealistisch'},{v:'digital',l:'Digitale Kunst'},{v:'anime',l:'Anime / Manga'},{v:'oel',l:'Ölgemälde'},{v:'aquarell',l:'Aquarell'},{v:'minimalistisch',l:'Minimalistisch'},{v:'cyberpunk',l:'Cyberpunk'},{v:'fantasy',l:'Fantasy'},{v:'vintage',l:'Vintage / Retro'},{v:'logo',l:'Logo / Icon'}],
+    video:        [{v:'cinematic',l:'Cinematic'},{v:'documentary',l:'Dokumentarfilm'},{v:'anime',l:'Anime / Animation'},{v:'commercial',l:'Werbespot'},{v:'social',l:'Social Media Clip'}],
+    text:         [{v:'professionell',l:'Professionell'},{v:'kreativ',l:'Kreativ'},{v:'informell',l:'Informell / Casual'},{v:'akademisch',l:'Akademisch'},{v:'marketing',l:'Marketing / Sales'},{v:'humorvoll',l:'Humorvoll'},{v:'inspirierend',l:'Inspirierend'}],
+    code:         [{v:'clean',l:'Clean Code'},{v:'performance',l:'Performance-optimiert'},{v:'beginner',l:'Anfängerfreundlich'},{v:'documented',l:'Gut dokumentiert'},{v:'minimal',l:'Minimal / Kompakt'}],
+    social:       [{v:'inspirierend',l:'Inspirierend'},{v:'informativ',l:'Informativ'},{v:'humorvoll',l:'Humorvoll'},{v:'werbend',l:'Werbend / CTA'},{v:'storytelling',l:'Storytelling'}],
+    email:        [{v:'formell',l:'Formell / Geschäftlich'},{v:'freundlich',l:'Freundlich'},{v:'direkt',l:'Direkt / Knapp'},{v:'ueberzeugend',l:'Überzeugend'},{v:'empathisch',l:'Empathisch'}],
+    praesentation:[{v:'professionell',l:'Professionell'},{v:'kreativ',l:'Kreativ / Modern'},{v:'akademisch',l:'Akademisch'},{v:'pitch',l:'Pitch / Sales'},{v:'storytelling',l:'Storytelling'}],
+};
+
+const STYLE_LABELS = {allgemein:'Aufgabentyp',bild:'Stil',video:'Stil',text:'Ton',code:'Code-Qualität',social:'Ton',email:'Ton',praesentation:'Stil'};
+
+const ADV = {
+    allgemein: [
+        {id:'detail',l:'Detailtiefe',opts:[{v:'ueberblick',l:'Überblick (kompakt)'},{v:'detailliert',l:'Detailliert'},{v:'experte',l:'Experten-Niveau'}]},
+        {id:'outputFmt',l:'Ausgabeformat',opts:[{v:'markdown',l:'Markdown (empfohlen)'},{v:'json',l:'JSON'},{v:'plain',l:'Fließtext'}]},
+    ],
+    bild: [
+        {id:'lighting',l:'Beleuchtung',opts:[{v:'none',l:'– Beliebig –'},{v:'natuerlich',l:'Natürliches Licht'},{v:'studio',l:'Studio'},{v:'dramatisch',l:'Dramatisch'},{v:'golden',l:'Golden Hour'},{v:'neon',l:'Neon / Nacht'}]},
+        {id:'ratio',l:'Seitenverhältnis',opts:[{v:'1:1',l:'1:1 (Quadrat)'},{v:'16:9',l:'16:9 (Landscape)'},{v:'9:16',l:'9:16 (Story/Portrait)'},{v:'4:3',l:'4:3'},{v:'3:2',l:'3:2 (Foto)'},{v:'2:3',l:'2:3 (Hochformat)'}]},
+        {id:'camera',l:'Perspektive',opts:[{v:'none',l:'– Beliebig –'},{v:'aug',l:'Augenhöhe'},{v:'weitwinkel',l:'Weitwinkel'},{v:'nah',l:'Nahaufnahme / Macro'},{v:'vogel',l:'Vogelperspektive'},{v:'portrait',l:'Portrait-Bokeh'}]},
+        {id:'colors',l:'Farbpalette',opts:[{v:'none',l:'– Beliebig –'},{v:'warm',l:'Warm (Orange/Rot)'},{v:'kalt',l:'Kalt (Blau/Silber)'},{v:'mono',l:'Monochrom / S&W'},{v:'bunt',l:'Bunt / Lebendig'},{v:'pastell',l:'Pastell / Sanft'}]},
+    ],
+    video: [
+        {id:'duration',l:'Dauer',opts:[{v:'5',l:'5 Sekunden'},{v:'10',l:'10 Sekunden'},{v:'15',l:'15 Sekunden'},{v:'30',l:'30 Sekunden'},{v:'60',l:'60 Sekunden'}]},
+        {id:'camMove',l:'Kamerabewegung',opts:[{v:'none',l:'– Beliebig –'},{v:'static',l:'Statisch'},{v:'slowzoom',l:'Slow Zoom In'},{v:'pan',l:'Pan (Schwenk)'},{v:'drone',l:'Drohnenflug'},{v:'handheld',l:'Handheld / Dynamisch'},{v:'tracking',l:'Tracking Shot'}]},
+        {id:'speed',l:'Tempo',opts:[{v:'normal',l:'Normal'},{v:'slow',l:'Zeitlupe'},{v:'timelapse',l:'Zeitraffer'}]},
+    ],
+    text: [
+        {id:'format',l:'Format',opts:[{v:'fliesstext',l:'Fließtext'},{v:'aufzaehlung',l:'Bullet Points'},{v:'tabelle',l:'Tabelle'},{v:'faq',l:'FAQ'},{v:'schritt',l:'Schritt-für-Schritt'}]},
+        {id:'length',l:'Länge',opts:[{v:'kurz',l:'Kurz (1-2 Absätze)'},{v:'mittel',l:'Mittel (3-5 Absätze)'},{v:'lang',l:'Lang / Ausführlich'}]},
+        {id:'audience',l:'Zielgruppe',opts:[{v:'allgemein',l:'Allgemein'},{v:'experten',l:'Fachexperten'},{v:'einsteiger',l:'Einsteiger'},{v:'geschaeft',l:'Geschäftsleute'},{v:'jugend',l:'Jugendliche'}]},
+        {id:'outputFmt',l:'Ausgabeformat',opts:[{v:'markdown',l:'Markdown (empfohlen)'},{v:'json',l:'JSON'},{v:'plain',l:'Fließtext'}]},
+    ],
+    code: [
+        {id:'codeLang',l:'Programmiersprache',opts:[{v:'python',l:'Python'},{v:'javascript',l:'JavaScript'},{v:'typescript',l:'TypeScript'},{v:'java',l:'Java'},{v:'csharp',l:'C#'},{v:'cpp',l:'C++'},{v:'go',l:'Go'},{v:'rust',l:'Rust'},{v:'swift',l:'Swift'},{v:'php',l:'PHP'},{v:'andere',l:'Beliebig / Andere'}]},
+        {id:'codeComments',l:'Kommentare',opts:[{v:'detailliert',l:'Detailliert kommentiert'},{v:'minimal',l:'Minimal'},{v:'keine',l:'Keine Kommentare'}]},
+    ],
+    social: [
+        {id:'platform',l:'Plattform',opts:[{v:'instagram',l:'Instagram'},{v:'linkedin',l:'LinkedIn'},{v:'twitter',l:'Twitter / X'},{v:'tiktok',l:'TikTok'},{v:'facebook',l:'Facebook'},{v:'youtube',l:'YouTube Community'}]},
+        {id:'hashtags',l:'Hashtags',opts:[{v:'ja',l:'Ja – hinzufügen'},{v:'nein',l:'Keine Hashtags'}]},
+        {id:'emojis',l:'Emojis',opts:[{v:'ja',l:'Ja – verwenden'},{v:'nein',l:'Keine Emojis'}]},
+    ],
+    email: [
+        {id:'recipient',l:'Empfänger',opts:[{v:'chef',l:'Vorgesetzter / Chef'},{v:'kollege',l:'Kollege'},{v:'kunde',l:'Kunde / Geschäftspartner'},{v:'unbekannt',l:'Unbekannte Person'},{v:'team',l:'Team / Gruppe'}]},
+        {id:'emailLen',l:'Länge',opts:[{v:'kurz',l:'Kurz und prägnant'},{v:'mittel',l:'Mittel'},{v:'ausfuehrlich',l:'Ausführlich'}]},
+    ],
+    praesentation: [
+        {id:'slides',l:'Anzahl Folien',opts:[{v:'5',l:'5 Folien'},{v:'10',l:'10 Folien'},{v:'15',l:'15 Folien'},{v:'20',l:'20+ Folien'}]},
+        {id:'presAud',l:'Zielgruppe',opts:[{v:'management',l:'Management / Führung'},{v:'team',l:'Team / Kollegen'},{v:'kunden',l:'Kunden / Investoren'},{v:'studenten',l:'Studenten / Schüler'},{v:'allgemein',l:'Allgemeines Publikum'}]},
+    ],
+};
+
+const PLACEHOLDERS = {
+    allgemein:'Was möchtest du wissen oder erledigen?\n\nBeispiele:\n• Erkläre mir den Unterschied zwischen GmbH und UG\n• Recherchiere die Top 5 CRM-Systeme für kleine Teams\n• Hilf mir bei der Optimierung meines Onboarding-Prozesses\n• Was sind die wichtigsten KPIs im E-Commerce?',
+    bild:'Beschreibe dein Bild...\n\nBeispiele:\n• Ein Astronaut tanzt auf dem Mond\n• Gemütliches Café in Paris an einem Regentag\n• Ein Wolf im Mondlicht auf einem Berggipfel',
+    video:'Beschreibe dein Video...\n\nBeispiele:\n• Eine Drohne fliegt über eine verschneite Berglandschaft\n• Zeitraffer eines Sonnenuntergangs am Meer',
+    text:'Was soll der Text beinhalten?\n\nBeispiele:\n• Erkläre mir, wie Blockchain funktioniert\n• Schreibe einen Blogbeitrag über gesunde Ernährung',
+    code:'Was soll der Code tun?\n\nBeispiele:\n• Erstelle eine Funktion zum Sortieren einer Liste\n• Baue ein Login-System mit JWT',
+    social:'Worum geht es in deinem Post?\n\nBeispiele:\n• Neues Produkt Launch für unsere App\n• Motivierender Montags-Post für mein Business',
+    email:'Was soll die E-Mail enthalten?\n\nBeispiele:\n• Bitte um ein Meeting mit meinem Vorgesetzten\n• Angebot an einen potenziellen Kunden',
+    praesentation:'Was soll präsentiert werden?\n\nBeispiele:\n• Unser Startup-Konzept für Investoren\n• Quartalszahlen und Ausblick fürs Team',
+};
+
+const TIPS = {
+    allgemein:'💡 Tipp: Markdown (empfohlen) erzeugt strukturiertere Antworten mit Überschriften & Bullet Points. JSON eignet sich, wenn du die Ausgabe weiterverarbeiten möchtest.',
+    bild:'💡 Tipp: Bei Midjourney kannst du --no [Begriffe] hinzufügen, um unerwünschte Elemente auszuschließen.',
+    video:'💡 Tipp: Beschreibe Stimmung und Bewegung so konkret wie möglich – das verbessert das Ergebnis erheblich.',
+    text:'💡 Tipp: Füge dem Prompt weitere Kontext-Details hinzu, um das Ergebnis noch präziser zu machen.',
+    code:'💡 Tipp: Beschreibe auch konkrete Input/Output-Beispiele – das hilft der KI, den Code korrekt umzusetzen.',
+    social:'💡 Tipp: Der erste Satz entscheidet über den Erfolg. Teste verschiedene Hook-Varianten.',
+    email:'💡 Tipp: Füge bisherige Kommunikation als Kontext hinzu, für eine noch persönlichere E-Mail.',
+    praesentation:'💡 Tipp: Für Gamma.app kannst du den Prompt direkt als Gliederungs-Input nutzen.',
+};
+
+// ── IMAGE KEYWORD MAPS ────────────────────────────────────────
+
+const IMG_STYLE = {
+    fotorealistisch:'photorealistic, hyperrealistic, 8K UHD, RAW photo, ultra-detailed, sharp focus, professional photography, DSLR',
+    digital:'digital art, digital painting, concept art, artstation trending, highly detailed illustration',
+    anime:'anime art style, manga illustration, Studio Ghibli inspired, cel shading, vibrant anime colors',
+    oel:'oil painting on canvas, classical art style, painterly texture, rich brushstrokes, museum quality',
+    aquarell:'watercolor painting, soft watercolor washes, delicate colors, flowing pigments',
+    minimalistisch:'minimalist design, clean composition, simple elegant lines, geometric shapes, flat design',
+    cyberpunk:'cyberpunk aesthetic, neon-lit city, futuristic dystopia, blade runner style, holographic elements',
+    fantasy:'epic fantasy art, magical atmosphere, ethereal lighting, mystical, enchanted world',
+    vintage:'vintage photography, film grain, retro aesthetic, analog, nostalgic, faded colors',
+    logo:'logo design, vector art, clean icon, professional branding, scalable, minimalist',
+};
+const IMG_LIGHTING = {
+    natuerlich:'natural lighting, soft daylight, ambient light',
+    studio:'professional studio lighting, three-point lighting, rim light',
+    dramatisch:'dramatic lighting, deep shadows, high contrast, chiaroscuro',
+    golden:'golden hour lighting, warm sunset glow, lens flare, backlighting',
+    neon:'neon lights, colorful reflections, night scene, urban glow',
+};
+const IMG_CAMERA = {
+    aug:'eye level perspective',
+    weitwinkel:'wide angle lens, expansive view',
+    nah:'close-up, macro photography',
+    vogel:"bird's eye view, aerial top-down perspective",
+    portrait:'portrait lens, f/1.8 bokeh, shallow depth of field',
+};
+const IMG_COLOR = {
+    warm:'warm color palette, golden amber and orange tones',
+    kalt:'cool color palette, blue and silver tones',
+    mono:'black and white, monochromatic, dramatic grayscale',
+    bunt:'vibrant colors, highly saturated, rich colorful palette',
+    pastell:'soft pastel colors, muted gentle hues',
+};
+const VID_CAMERA = {
+    static:'static locked-off shot',
+    slowzoom:'slow gentle zoom in',
+    pan:'smooth horizontal pan',
+    drone:'aerial drone shot, sweeping overhead',
+    handheld:'handheld camera, dynamic movement',
+    tracking:'smooth tracking shot following subject',
+};
+
+// ── UI LOGIC ──────────────────────────────────────────────────
+
+function onPurposeChange() {
+    const p = document.getElementById('purpose').value;
+
+    // Tools
+    document.getElementById('tool').innerHTML =
+        TOOLS[p].map(t => `<option value="${t.v}">${t.l}</option>`).join('');
+
+    // Styles
+    document.getElementById('style').innerHTML =
+        STYLES[p].map(s => `<option value="${s.v}">${s.l}</option>`).join('');
+    document.getElementById('styleLabel').textContent = STYLE_LABELS[p] || 'Stil';
+
+    // Advanced
+    document.getElementById('advGrid').innerHTML =
+        (ADV[p] || []).map(o =>
+            `<div class="option-group">
+                <label for="${o.id}">${o.l}</label>
+                <select id="${o.id}">${o.opts.map(x=>`<option value="${x.v}">${x.l}</option>`).join('')}</select>
+             </div>`
+        ).join('');
+
+    // Placeholder
+    document.getElementById('userInput').placeholder = PLACEHOLDERS[p] || '';
+}
+
+function toggleAdvanced() {
+    document.getElementById('advOptions').classList.toggle('open');
+    document.getElementById('advToggle').classList.toggle('open');
+}
+
+function val(id) {
+    const el = document.getElementById(id);
+    return el ? el.value : null;
+}
+
+// ── GENERATORS ───────────────────────────────────────────────
+
+function generate() {
+    const input = document.getElementById('userInput').value.trim();
+    if (!input) {
+        document.getElementById('errorMsg').classList.add('visible');
+        document.getElementById('userInput').focus();
+        return;
+    }
+    document.getElementById('errorMsg').classList.remove('visible');
+
+    const purpose  = document.getElementById('purpose').value;
+    const tool     = document.getElementById('tool').value;
+    const style    = document.getElementById('style').value;
+    const language = document.getElementById('language').value;
+
+    const generators = { allgemein, bild, video, text, code, social, email, praesentation };
+    const prompt = generators[purpose](input, tool, style, language);
+    showResult(prompt, purpose, tool);
+}
+
+function allgemein(input, tool, style, lang) {
+    const detail  = val('detail')    || 'detailliert';
+    const outFmt  = val('outputFmt') || 'markdown';
+    const outLang = lang === 'en' ? 'English' : 'Deutsch';
+
+    const roleMap = {
+        frage:        'hilfreicher Assistent',
+        recherche:    'Recherche-Assistent mit Fokus auf präzise, aktuelle Informationen',
+        brainstorming:'kreativer Brainstorming-Partner',
+        analyse:      'analytischer Berater',
+        strategie:    'erfahrener strategischer Business-Berater',
+    };
+    const detailMap = {
+        ueberblick:  'Gib einen kompakten Überblick – maximal 5-7 Kernpunkte',
+        detailliert: 'Antworte detailliert und vollständig strukturiert',
+        experte:     'Gehe auf Expertenniveau in die Tiefe, spare keine Details aus',
+    };
+
+    const role   = roleMap[style]  || 'hilfreicher Assistent';
+    const depth  = detailMap[detail] || detailMap.detailliert;
+
+    if (outFmt === 'markdown') {
+        return `# Aufgabe\n${input}\n\n---\n\n## Anforderungen\n- **Rolle:** Du bist ein ${role}\n- **Detailtiefe:** ${depth}\n- **Ausgabesprache:** ${outLang}\n\n## Ausgabeformat\nVerwende **Markdown**:\n- \`##\` für Hauptabschnitte\n- **Fettdruck** für Schlüsselbegriffe\n- \`-\` Bullet Points für Aufzählungen\n- \`>\` für wichtige Hinweise\n- Beginne mit einer kurzen **Zusammenfassung** (2-3 Sätze)\n- Schließe mit **Empfehlungen / nächsten Schritten** ab`;
+    }
+
+    if (outFmt === 'json') {
+        return `Du bist ein ${role}.\n\nAufgabe: ${input}\n\nAntworte ausschließlich im folgenden JSON-Format:\n\`\`\`json\n{\n  "zusammenfassung": "Kurze Zusammenfassung in 2-3 Sätzen",\n  "hauptpunkte": [\n    { "punkt": "...", "detail": "..." }\n  ],\n  "empfehlungen": ["...", "..."],\n  "naechste_schritte": ["...", "..."]\n}\n\`\`\`\n\nSprache: ${outLang}\nDetailtiefe: ${depth}`;
+    }
+
+    // Fließtext
+    return `Du bist ein ${role}.\n\nAufgabe: ${input}\n\nAnforderungen:\n- ${depth}\n- Ausgabesprache: ${outLang}\n- Beginne direkt mit dem Inhalt, ohne lange Einleitung\n- Schließe mit konkreten Empfehlungen oder nächsten Schritten ab`;
+}
+
+function bild(input, tool, style, lang) {
+    const lighting = val('lighting') || 'none';
+    const ratio    = val('ratio')    || '1:1';
+    const camera   = val('camera')   || 'none';
+    const colors   = val('colors')   || 'none';
+
+    const parts = [input.trim()];
+    if (IMG_STYLE[style])             parts.push(IMG_STYLE[style]);
+    if (lighting !== 'none' && IMG_LIGHTING[lighting]) parts.push(IMG_LIGHTING[lighting]);
+    if (camera   !== 'none' && IMG_CAMERA[camera])     parts.push(IMG_CAMERA[camera]);
+    if (colors   !== 'none' && IMG_COLOR[colors])      parts.push(IMG_COLOR[colors]);
+
+    const base = parts.join(', ');
+
+    if (tool === 'midjourney') return `${base} --ar ${ratio} --v 6.1 --q 2 --stylize 750`;
+    if (tool === 'dalle')      return `Create a detailed, high-quality image:\n\n${base}\n\nMake it visually stunning with excellent composition and lighting.`;
+    if (tool === 'stable')     return `${base}, masterpiece, best quality, highly detailed, 8k\n\nNegative prompt: blurry, low quality, deformed, watermark, text`;
+    if (tool === 'nanobanana') return `${base}, high quality, ultra-detailed, sharp focus --ar ${ratio}`;
+    return `${base}, high quality, ultra-detailed, sharp focus`;
+}
+
+function video(input, tool, style, lang) {
+    const duration = val('duration') || '10';
+    const camMove  = val('camMove')  || 'none';
+    const speed    = val('speed')    || 'normal';
+
+    const styleKw = {cinematic:'cinematic, film-quality',documentary:'documentary style, realistic',anime:'anime animation, vibrant dynamic',commercial:'commercial quality, polished',social:'social media optimized, engaging'};
+    const speedTxt = speed === 'slow' ? 'slow motion' : speed === 'timelapse' ? 'time-lapse' : '';
+    const camTxt   = camMove !== 'none' ? (VID_CAMERA[camMove] || '') : '';
+
+    const parts = [
+        `A ${duration}-second ${styleKw[style] || 'cinematic'} video: ${input}`,
+        camTxt  ? `Camera movement: ${camTxt}.` : '',
+        speedTxt ? `${speedTxt.charAt(0).toUpperCase() + speedTxt.slice(1)}.` : '',
+        'Smooth motion, professional color grading, high production quality.',
+    ].filter(Boolean);
+
+    let prompt = parts.join(' ');
+    if (tool === 'googleveo') prompt += '\n\nStyle: photorealistic, Google Veo 3.0, cinematic quality, consistent motion, no artifacts.';
+    return prompt;
+}
+
+function text(input, tool, tone, lang) {
+    const format    = val('format')    || 'fliesstext';
+    const length    = val('length')    || 'mittel';
+    const audience  = val('audience')  || 'allgemein';
+    const outputFmt = val('outputFmt') || 'plain';
+
+    const toneMap = {professionell:'professionell und sachlich',kreativ:'kreativ und einzigartig',informell:'locker und informell',akademisch:'akademisch und präzise',marketing:'überzeugend und mehrwertstiftend',humorvoll:'humorvoll und unterhaltsam',inspirierend:'inspirierend und motivierend'};
+    const fmtMap  = {fliesstext:'als zusammenhängenden Fließtext',aufzaehlung:'als übersichtliche Aufzählung (Bullet Points)',tabelle:'als strukturierte Tabelle',faq:'im FAQ-Format (Fragen & Antworten)',schritt:'als nummerierte Schritt-für-Schritt-Anleitung'};
+    const lenMap  = {kurz:'kurz und prägnant (ca. 1-2 Absätze)',mittel:'mittel (ca. 3-5 Absätze)',lang:'ausführlich und detailliert'};
+    const audMap  = {allgemein:'ein allgemeines Publikum',experten:'Fachexperten',einsteiger:'Einsteiger ohne Vorkenntnisse',geschaeft:'Geschäftsleute und Entscheidungsträger',jugend:'Jugendliche'};
+    const outLang = lang === 'en' ? 'Englisch' : 'Deutsch';
+    const role    = detectRole(input);
+
+    const fmtInstruction = outputFmt === 'markdown'
+        ? '- **Ausgabeformat:** Markdown – verwende `##` Überschriften, **Fettdruck** und Bullet Points'
+        : outputFmt === 'json'
+        ? '- **Ausgabeformat:** JSON – strukturiere die Ausgabe als valides JSON-Objekt'
+        : '- **Ausgabeformat:** Fließtext ohne Sonderformatierung';
+
+    return `Du bist ein ${role}.
+
+Aufgabe: ${input}
+
+Anforderungen:
+- Ton: ${toneMap[tone] || 'professionell'}
+- Format: ${fmtMap[format] || 'Fließtext'}
+- Länge: ${lenMap[length] || 'mittel'}
+- Zielgruppe: ${audMap[audience] || 'allgemeines Publikum'}
+- Ausgabesprache: ${outLang}
+${fmtInstruction}
+
+Stelle sicher, dass der Text:
+✓ Den Kerninhalt klar und verständlich vermittelt
+✓ Keine unnötigen Füllwörter enthält
+✓ Den gewünschten Ton durchgehend beibehält
+✓ Direkt – ohne lange Einleitung – mit dem Inhalt beginnt`;
+}
+
+function code(input, tool, quality, lang) {
+    const codeLang  = val('codeLang')      || 'python';
+    const comments  = val('codeComments')  || 'detailliert';
+
+    const langNames = {python:'Python',javascript:'JavaScript',typescript:'TypeScript',java:'Java',csharp:'C#',cpp:'C++',go:'Go',rust:'Rust',swift:'Swift',php:'PHP',andere:'der passenden Sprache'};
+    const qualMap   = {clean:'sauber nach Clean-Code-Prinzipien',performance:'performance-optimiert',beginner:'anfängerfreundlich und einfach verständlich',documented:'umfassend dokumentiert',minimal:'minimal und kompakt'};
+    const commMap   = {detailliert:'Jede Funktion und komplexe Logik ausführlich kommentieren',minimal:'Nur kritische Stellen kommentieren',keine:'Keine Kommentare'};
+    const outLang   = lang === 'en' ? 'English' : 'Deutsch';
+
+    return `Du bist ein erfahrener ${langNames[codeLang] || 'Software'}-Entwickler.
+
+Aufgabe: ${input}
+
+Technische Anforderungen:
+- Programmiersprache: ${langNames[codeLang] || codeLang}
+- Code-Qualität: ${qualMap[quality] || 'sauber und wartbar'}
+- Kommentare: ${commMap[comments]}
+- Fehlerbehandlung: Robuste Fehlerbehandlung implementieren
+- Best Practices: Branchenübliche Standards einhalten
+
+Liefere:
+1. Vollständigen, direkt ausführbaren Code
+2. Kurze Erklärung des Ansatzes (3-5 Sätze)
+3. Verwendungsbeispiel mit konkreten Werten
+4. Hinweise auf mögliche Erweiterungen
+
+Antworte auf ${outLang}.`;
+}
+
+function social(input, tool, tone, lang) {
+    const platform = val('platform') || 'instagram';
+    const hashtags = val('hashtags') || 'ja';
+    const emojis   = val('emojis')   || 'ja';
+
+    const platCfg = {
+        instagram:{name:'Instagram',   limit:'2.200',   tip:'Hook im ersten Satz, visuell beschreibend'},
+        linkedin: {name:'LinkedIn',    limit:'3.000',   tip:'Professionell, persönliche Erfahrungen, Mehrwert'},
+        twitter:  {name:'Twitter / X', limit:'280',     tip:'Kurz, prägnant, meinungsstark'},
+        tiktok:   {name:'TikTok',      limit:'2.200',   tip:'Energetisch, Trend-bewusst, Duet/Stitch-CTA'},
+        facebook: {name:'Facebook',    limit:'63.000',  tip:'Community-orientiert, zum Teilen animierend'},
+        youtube:  {name:'YouTube',     limit:'5.000',   tip:'Community-Engagement, Teaser für Inhalte'},
+    };
+    const toneMap = {inspirierend:'inspirierend und motivierend',informativ:'informativ und mehrwertstiftend',humorvoll:'humorvoll und unterhaltsam',werbend:'überzeugend mit klarem Call-to-Action',storytelling:'als persönliches Erlebnis (Storytelling)'};
+    const pc = platCfg[platform] || platCfg.instagram;
+    const outLang = lang === 'en' ? 'Englisch' : 'Deutsch';
+
+    return `Du bist ein erfahrener Social-Media-Manager, spezialisiert auf ${pc.name}.
+
+Erstelle einen ${pc.name}-Post über:
+"${input}"
+
+Anforderungen:
+- Ton: ${toneMap[tone] || 'ansprechend'}
+- Plattform-Hinweis: ${pc.tip}
+- Zeichenlimit: max. ${pc.limit} Zeichen
+- Hashtags: ${hashtags === 'ja' ? '5-10 relevante Hashtags am Ende' : 'Keine Hashtags'}
+- Emojis: ${emojis === 'ja' ? 'Passende Emojis strategisch einsetzen' : 'Keine Emojis'}
+- Sprache: ${outLang}
+
+Der Post soll:
+✓ Mit einem starken Hook beginnen
+✓ Den Leser emotional ansprechen oder Mehrwert bieten
+✓ Mit einem klaren Call-to-Action enden
+
+Nur den fertigen Post-Text ausgeben, ohne Erklärungen.`;
+}
+
+function email(input, tool, tone, lang) {
+    const recipient = val('recipient') || 'kollege';
+    const emailLen  = val('emailLen')  || 'mittel';
+
+    const recMap  = {chef:'Vorgesetzten / Chef',kollege:'Kollegen',kunde:'Kunden oder Geschäftspartner',unbekannt:'unbekannte Person (formell)',team:'Team oder Gruppe'};
+    const lenMap  = {kurz:'kurz und prägnant (max. 3-4 Sätze im Hauptteil)',mittel:'mittel (2-3 kurze Absätze)',ausfuehrlich:'ausführlich mit allen relevanten Details'};
+    const toneMap = {formell:'formell und geschäftsmäßig',freundlich:'freundlich und kollegial',direkt:'direkt und auf den Punkt',ueberzeugend:'überzeugend und argumentativ',empathisch:'empathisch und verständnisvoll'};
+    const outLang = lang === 'en' ? 'Englisch' : 'Deutsch';
+
+    return `Du bist ein professioneller Business-Kommunikator.
+
+Inhalt der E-Mail: "${input}"
+
+Rahmenbedingungen:
+- Empfänger: ${recMap[recipient] || 'Kollegen'}
+- Ton: ${toneMap[tone] || 'professionell'}
+- Länge: ${lenMap[emailLen] || 'mittel'}
+- Sprache: ${outLang}
+
+Struktur:
+1. Betreff: Aussagekräftig, max. 60 Zeichen
+2. Anrede: Passend zum Empfänger
+3. Hauptteil: ${lenMap[emailLen]}
+4. Abschluss: Höfliche Schlussformel
+5. Signatur: Platzhalter [Name], [Position], [Unternehmen]
+
+Nur die fertige E-Mail ausgeben, ohne zusätzliche Kommentare.`;
+}
+
+function praesentation(input, tool, style, lang) {
+    const slides  = val('slides')  || '10';
+    const presAud = val('presAud') || 'allgemein';
+
+    const audMap   = {management:'Management/Führungskräfte (Fokus auf ROI und Entscheidungen)',team:'eigenes Team (kollegial, detailliert)',kunden:'Kunden/Investoren (überzeugend, Mehrwert)',studenten:'Studenten/Schüler (lehrreich, klar)',allgemein:'allgemeines Publikum'};
+    const styleMap = {professionell:'professionell und sachlich',kreativ:'kreativ und visuell ansprechend',akademisch:'akademisch und evidenzbasiert',pitch:'überzeugenden Sales-Pitch',storytelling:'Storytelling-Format'};
+    const outLang  = lang === 'en' ? 'Englisch' : 'Deutsch';
+
+    return `Du bist ein erfahrener Präsentationsexperte.
+
+Thema: "${input}"
+
+Rahmenbedingungen:
+- Stil: ${styleMap[style] || 'professionell'}
+- Anzahl Folien: ${slides}
+- Zielgruppe: ${audMap[presAud] || 'allgemeines Publikum'}
+- Sprache: ${outLang}
+
+Erstelle für jede Folie:
+• Folientitel (kurz und prägnant)
+• Kerninhalt (3-5 Bullet Points)
+• Visualisierungsvorschlag
+
+Zusätzlich:
+- Packende Eröffnungsfolie
+- Kernbotschaft der gesamten Präsentation
+- Starke Abschlussfolie mit Call-to-Action
+
+Antworte auf ${outLang}.`;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+
+function detectRole(input) {
+    const l = input.toLowerCase();
+    if (/code|programm|script|funktion|app|entwickl/.test(l))  return 'erfahrener Software-Entwickler';
+    if (/blog|artikel|beitrag|seo|text schreib/.test(l))        return 'professioneller Content-Writer';
+    if (/social|instagram|linkedin|tiktok|post/.test(l))        return 'Social-Media-Experte';
+    if (/marketing|werbung|kampagne|anzeige/.test(l))           return 'erfahrener Marketing-Experte';
+    if (/analyse|report|bericht|daten/.test(l))                 return 'Business-Analyst';
+    if (/erkläre?|was ist|wie funktioniert/.test(l))            return 'Bildungsexperte für komplexe Themen';
+    if (/rezept|kochen|essen/.test(l))                          return 'Profi-Koch';
+    if (/reise|urlaub|trip/.test(l))                            return 'erfahrener Reiseexperte';
+    return 'erfahrener Experte auf diesem Gebiet';
+}
+
+function showResult(prompt, purpose, tool) {
+    document.getElementById('promptOutput').textContent = prompt;
+    document.getElementById('charCount').textContent =
+        `${prompt.length} Zeichen · ${prompt.trim().split(/\s+/).length} Wörter`;
+
+    const purposeLabels = {allgemein:'💬 Allgemein',bild:'🖼️ Bild',video:'🎬 Video',text:'📝 Text',code:'💻 Code',social:'📱 Social Media',email:'📧 E-Mail',praesentation:'📊 Präsentation'};
+    document.getElementById('badgePurpose').textContent = purposeLabels[purpose] || purpose;
+
+    const toolLabel = (TOOLS[purpose] || []).find(t => t.v === tool)?.l || tool;
+    document.getElementById('badgeTool').textContent = toolLabel;
+
+    const tipEl = document.getElementById('tipBox');
+    if (TIPS[purpose]) { tipEl.textContent = TIPS[purpose]; tipEl.classList.add('visible'); }
+    else tipEl.classList.remove('visible');
+
+    const card = document.getElementById('resultCard');
+    card.classList.add('visible');
+    document.getElementById('copyBtn').textContent = '📋  Kopieren';
+    document.getElementById('copyBtn').classList.remove('copied');
+
+    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+
+function copyPrompt() {
+    const text = document.getElementById('promptOutput').textContent;
+    const btn  = document.getElementById('copyBtn');
+
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+
+    let success = false;
+    try { success = document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+
+    if (success) {
+        btn.textContent = '✅  Kopiert!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '📋  Kopieren'; btn.classList.remove('copied'); }, 2000);
+    } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = '✅  Kopiert!';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = '📋  Kopieren'; btn.classList.remove('copied'); }, 2000);
+        }).catch(() => { btn.textContent = '❌  Nicht verfügbar'; setTimeout(() => { btn.textContent = '📋  Kopieren'; }, 2000); });
+    }
+}
+
+function resetForm() {
+    // Textfeld leeren
+    document.getElementById('userInput').value = '';
+    document.getElementById('errorMsg').classList.remove('visible');
+
+    // Alle Dropdowns auf erste Option zurücksetzen
+    document.getElementById('purpose').selectedIndex = 0;
+    document.getElementById('language').selectedIndex = 0;
+
+    // Zweck-abhängige Optionen neu initialisieren
+    onPurposeChange();
+
+    // Erweiterte Optionen einklappen
+    document.getElementById('advOptions').classList.remove('open');
+    document.getElementById('advToggle').classList.remove('open');
+
+    // Ergebnis ausblenden
+    document.getElementById('resultCard').classList.remove('visible');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.getElementById('userInput').focus();
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', onPurposeChange);
+</script>
+</body>
+</html>

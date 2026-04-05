@@ -567,9 +567,201 @@ function generate() {
     const language = document.getElementById('language').value;
 
     const generators = { allgemein, bild, video, text, code, social, email, praesentation };
-    const prompt = generators[purpose](input, tool, style, language);
+    const rawPrompt = generators[purpose](input, tool, style, language);
+    const prompt = wrapForLLM(rawPrompt, tool, purpose);
     showResult(prompt, purpose, tool);
 }
+
+// ── LLM-SPECIFIC WRAPPER ─────────────────────────────────────
+// Wraps the final prompt with LLM-specific syntax and instructions.
+// Claude → XML tags, system-style structure
+// ChatGPT → "You are..." system message style, "Let's think step by step"
+// Gemini → structured, clear sections
+// Perplexity → research-focused, source-citing instructions
+
+function wrapForLLM(prompt, tool, purpose) {
+    // Image/video generators don't need LLM wrapping
+    if (purpose === 'bild' || purpose === 'video') return prompt;
+
+    if (tool === 'claude') {
+        // Claude responds best to XML-style tags and structured instructions
+        return prompt
+            .replace(/^# Rolle\n/m, '<role>\n')
+            .replace(/\n# Aufgabe\n/m, '\n</role>\n\n<task>\n')
+            .replace(/\n# Vorgaben\n/m, '\n</task>\n\n<requirements>\n')
+            .replace(/\n# Dein Vorgehen/m, '\n</requirements>\n\n<thinking_process>')
+            .replace(/\n# Detailtiefe\n/m, '\n</task>\n\n<detail_level>\n')
+            .replace(/\n# Ausgabesprache\n/m, '\n</detail_level>\n\n<language>\n')
+            .replace(/\n## Bevor du antwortest/m, '\n</language>\n\n<thinking_process>')
+            .replace(/\n## Before You Respond/m, '\n</language>\n\n<thinking_process>')
+            .replace(/\n## Qualitätsregeln/m, '\n</thinking_process>\n\n<quality_rules>')
+            .replace(/\n## Quality Rules/m, '\n</thinking_process>\n\n<quality_rules>')
+            .replace(/\n## Ausgabeformat/m, '\n</quality_rules>\n\n<output_format>')
+            .replace(/\n## Output Format/m, '\n</quality_rules>\n\n<output_format>')
+            .replace(/\n## Abschlusskontrolle/m, '\n</output_format>\n\n<verification>')
+            .replace(/\n## Final Check/m, '\n</output_format>\n\n<verification>')
+            .replace(/\n## Selbstverbesserung/m, '\n</verification>\n\n<self_improvement>')
+            .replace(/\n## Self-Improvement/m, '\n</verification>\n\n<self_improvement>')
+            + '\n</self_improvement>';
+    }
+
+    if (tool === 'chatgpt' || tool === 'copilot') {
+        // ChatGPT responds well to "Let's think step by step" and clear system-style
+        const prefix = "Let's work through this systematically and think step by step.\n\n";
+        return prefix + prompt;
+    }
+
+    if (tool === 'perplexity') {
+        // Perplexity: research focus, source citing
+        const suffix = `\n\n## Quellenhinweis
+- Stütze deine Antwort auf aktuelle, verifizierbare Quellen
+- Zitiere Quellen mit Links wo verfügbar
+- Bevorzuge primäre Quellen (Studien, offizielle Berichte) vor sekundären
+- Kennzeichne Informationen ohne Quellenbeleg als „eigene Einschätzung"`;
+        return prompt + suffix;
+    }
+
+    // Gemini, Cursor, other: return as-is (Markdown structure works well)
+    return prompt;
+}
+
+// ── QUALITY BLOCKS (shared across text-based generators) ─────
+
+function qualityRules(lang) {
+    return lang === 'en'
+? `## Quality Rules
+- ❌ Do NOT invent facts, statistics, sources, or quotes
+- ❌ If uncertain, state it openly: "I'm not certain about this, but..."
+- ❌ Do NOT give a vague non-answer — if you have relevant knowledge, share it with appropriate caveats
+- ✅ Clearly distinguish between verified facts and your own assessment
+- ✅ Mark your confidence level: 🟢 high confidence | 🟡 moderate — verify independently | 🔴 uncertain — treat as starting point only
+- ✅ Mention limitations, prerequisites, or risks when relevant
+- ✅ If the request is ambiguous, ask 2-3 clarifying questions BEFORE answering
+- ✅ Cite concrete examples, data points, or analogies to support your arguments`
+: `## Qualitätsregeln
+- ❌ Erfinde KEINE Fakten, Zahlen, Statistiken oder Quellen
+- ❌ Wenn du unsicher bist, sage es offen: „Hierzu bin ich nicht sicher, aber..."
+- ❌ Gib KEINE vage Nicht-Antwort — wenn du relevantes Wissen hast, teile es mit angemessenen Einschränkungen
+- ✅ Unterscheide klar zwischen gesicherten Fakten und deiner eigenen Einschätzung
+- ✅ Kennzeichne dein Konfidenzniveau: 🟢 hohe Sicherheit | 🟡 mittlere Sicherheit — unabhängig verifizieren | 🔴 unsicher — nur als Ausgangspunkt nutzen
+- ✅ Nenne Einschränkungen, Voraussetzungen oder Risiken, wenn relevant
+- ✅ Wenn die Anfrage unklar ist, stelle 2-3 gezielte Rückfragen BEVOR du antwortest
+- ✅ Untermauere Argumente mit konkreten Beispielen, Daten oder Analogien`;
+}
+
+function thinkingProcess(lang) {
+    return lang === 'en'
+? `## Before You Respond — Think Step by Step
+1. **Understand**: What exactly is being asked? Identify the core question and any implicit sub-questions
+2. **Context**: What does the user likely need this for? Tailor depth and format accordingly
+3. **Gather**: What knowledge, facts, frameworks, and mental models are relevant?
+4. **Analyze**: Are there multiple perspectives, trade-offs, counterarguments, or common misconceptions?
+5. **Structure**: Organize your response — most important information first, details second
+6. **Verify**: Before outputting, check: Is everything correct? Am I assuming things that should be stated?`
+: `## Bevor du antwortest — Denke Schritt für Schritt
+1. **Verstehen**: Was genau wird gefragt? Identifiziere die Kernfrage und implizite Teilfragen
+2. **Kontext**: Wofür braucht der Nutzer das wahrscheinlich? Passe Tiefe und Format entsprechend an
+3. **Sammeln**: Welche Fakten, Konzepte, Frameworks und Denkmodelle sind relevant?
+4. **Analysieren**: Gibt es mehrere Perspektiven, Abwägungen, Gegenargumente oder häufige Irrtümer?
+5. **Strukturieren**: Ordne deine Antwort — das Wichtigste zuerst, Details danach
+6. **Prüfen**: Bevor du ausgibst: Ist alles korrekt? Setze ich Dinge voraus, die ich explizit nennen sollte?`;
+}
+
+function verifyBlock(lang) {
+    return lang === 'en'
+? `## Final Check
+Before outputting your response, verify:
+✓ All facts are correct and not fabricated
+✓ The response fully addresses the original question — nothing important is missing
+✓ The structure is clear, logical, and easy to follow
+✓ Concrete, actionable next steps or recommendations are included
+✓ Confidence markers (🟢🟡🔴) are used where appropriate
+✓ The tone matches the requested style consistently`
+: `## Abschlusskontrolle
+Überprüfe deine Antwort vor der Ausgabe:
+✓ Alle Fakten sind korrekt und nicht erfunden
+✓ Die Antwort geht vollständig auf die ursprüngliche Frage ein — nichts Wichtiges fehlt
+✓ Die Struktur ist klar, logisch und leicht nachvollziehbar
+✓ Konkrete, umsetzbare nächste Schritte oder Empfehlungen sind enthalten
+✓ Konfidenzkennzeichnungen (🟢🟡🔴) sind wo nötig gesetzt
+✓ Der Ton entspricht durchgehend dem gewünschten Stil`;
+}
+
+function selfImproveBlock(lang) {
+    return lang === 'en'
+? `## Self-Improvement — Internal Review
+After writing your response, perform this internal review (do NOT show this process to the user):
+1. **Completeness**: Did I miss any aspect of the question? → If yes, add it
+2. **Accuracy**: Is there anything I stated as fact that I'm not sure about? → Add confidence marker
+3. **Usefulness**: Will the user be able to ACT on this response? → Make it more concrete if needed
+4. **Brevity**: Is there unnecessary repetition or filler? → Remove it
+5. **Blind spots**: What might I be wrong about? → Mention it as a caveat
+
+Then output only the improved, final version.`
+: `## Selbstverbesserung — Interne Prüfung
+Führe nach dem Schreiben deiner Antwort diese interne Prüfung durch (zeige diesen Prozess NICHT dem Nutzer):
+1. **Vollständigkeit**: Habe ich einen Aspekt der Frage übersehen? → Wenn ja, ergänze ihn
+2. **Korrektheit**: Habe ich etwas als Fakt dargestellt, bei dem ich unsicher bin? → Konfidenzkennzeichnung ergänzen
+3. **Nutzwert**: Kann der Nutzer mit dieser Antwort direkt HANDELN? → Wenn nötig, konkreter formulieren
+4. **Prägnanz**: Gibt es unnötige Wiederholungen oder Fülltext? → Entfernen
+5. **Blinde Flecken**: Worin könnte ich falsch liegen? → Als Einschränkung benennen
+
+Gib dann NUR die verbesserte, finale Version aus.`;
+}
+
+function formatBlock(outFmt, lang) {
+    if (outFmt === 'markdown') {
+        return lang === 'en'
+? `## Output Format — Markdown
+- Use \`##\` headings for main sections
+- Use **bold** for key terms and important conclusions
+- Use \`-\` bullet points for lists
+- Use \`>\` blockquotes for important warnings or key takeaways
+- Use tables where comparisons help understanding
+- Start with a short **Summary** (2-3 sentences)
+- End with **Recommendations / Next Steps**`
+: `## Ausgabeformat — Markdown
+- Verwende \`##\` Überschriften für Hauptabschnitte
+- Verwende **Fettdruck** für Schlüsselbegriffe und wichtige Erkenntnisse
+- Verwende \`-\` Bullet Points für Aufzählungen
+- Verwende \`>\` Blockquotes für wichtige Warnungen oder Kernaussagen
+- Verwende Tabellen wo Vergleiche das Verständnis erleichtern
+- Beginne mit einer kurzen **Zusammenfassung** (2-3 Sätze)
+- Schließe mit **Empfehlungen / nächsten Schritten** ab`;
+    }
+    if (outFmt === 'json') {
+        return lang === 'en'
+? `## Output Format — JSON
+Respond exclusively in this JSON format:
+\`\`\`json
+{
+  "summary": "Concise summary in 2-3 sentences",
+  "key_points": [
+    { "point": "...", "detail": "...", "confidence": "high|medium|low" }
+  ],
+  "recommendations": ["..."],
+  "next_steps": ["..."],
+  "caveats": ["Any limitations or uncertainties"]
+}
+\`\`\``
+: `## Ausgabeformat — JSON
+Antworte ausschließlich in diesem JSON-Format:
+\`\`\`json
+{
+  "zusammenfassung": "Kurze Zusammenfassung in 2-3 Sätzen",
+  "hauptpunkte": [
+    { "punkt": "...", "detail": "...", "sicherheit": "hoch|mittel|niedrig" }
+  ],
+  "empfehlungen": ["..."],
+  "naechste_schritte": ["..."],
+  "einschraenkungen": ["Eventuelle Limitierungen oder Unsicherheiten"]
+}
+\`\`\``;
+    }
+    return '';
+}
+
+// ── GENERATORS ───────────────────────────────────────────────
 
 function allgemein(input, tool, style, lang) {
     const detail  = val('detail')    || 'detailliert';
@@ -577,31 +769,34 @@ function allgemein(input, tool, style, lang) {
     const outLang = lang === 'en' ? 'English' : 'Deutsch';
 
     const roleMap = {
-        frage:        'hilfreicher Assistent',
-        recherche:    'Recherche-Assistent mit Fokus auf präzise, aktuelle Informationen',
-        brainstorming:'kreativer Brainstorming-Partner',
-        analyse:      'analytischer Berater',
-        strategie:    'erfahrener strategischer Business-Berater',
+        frage:        'erfahrener Fachberater, der komplexe Themen klar und verständlich erklärt',
+        recherche:    'gründlicher Recherche-Analyst, der Informationen systematisch sammelt, bewertet und strukturiert aufbereitet',
+        brainstorming:'kreativer Innovationsberater, der unkonventionell denkt und vielfältige Perspektiven einbringt',
+        analyse:      'analytischer Unternehmensberater mit Expertise in Dateninterpretation und strategischer Bewertung',
+        strategie:    'erfahrener strategischer Business-Berater mit Fokus auf umsetzbare Handlungsempfehlungen',
     };
     const detailMap = {
-        ueberblick:  'Gib einen kompakten Überblick – maximal 5-7 Kernpunkte',
-        detailliert: 'Antworte detailliert und vollständig strukturiert',
-        experte:     'Gehe auf Expertenniveau in die Tiefe, spare keine Details aus',
+        ueberblick:  'Gib einen kompakten Überblick – maximal 5-7 Kernpunkte, fokussiert auf das Wesentliche',
+        detailliert: 'Antworte detailliert und vollständig strukturiert mit Erklärungen und Beispielen',
+        experte:     'Gehe auf Expertenniveau in die Tiefe – spare keine Details aus, zeige Zusammenhänge und Implikationen auf',
     };
 
-    const role   = roleMap[style]  || 'hilfreicher Assistent';
-    const depth  = detailMap[detail] || detailMap.detailliert;
+    const role  = roleMap[style]   || roleMap.frage;
+    const depth = detailMap[detail] || detailMap.detailliert;
 
-    if (outFmt === 'markdown') {
-        return `# Aufgabe\n${input}\n\n---\n\n## Anforderungen\n- **Rolle:** Du bist ein ${role}\n- **Detailtiefe:** ${depth}\n- **Ausgabesprache:** ${outLang}\n\n## Ausgabeformat\nVerwende **Markdown**:\n- \`##\` für Hauptabschnitte\n- **Fettdruck** für Schlüsselbegriffe\n- \`-\` Bullet Points für Aufzählungen\n- \`>\` für wichtige Hinweise\n- Beginne mit einer kurzen **Zusammenfassung** (2-3 Sätze)\n- Schließe mit **Empfehlungen / nächsten Schritten** ab`;
-    }
+    const sections = [
+        `# Rolle\nDu bist ein ${role}. Du arbeitest methodisch, faktenbasiert und denkst analytisch.`,
+        `\n# Aufgabe\n${input}`,
+        `\n# Detailtiefe\n${depth}`,
+        `\n# Ausgabesprache\n${outLang}`,
+        `\n${thinkingProcess(lang)}`,
+        `\n${qualityRules(lang)}`,
+        `\n${formatBlock(outFmt, lang)}`,
+        `\n${verifyBlock(lang)}`,
+        `\n${selfImproveBlock(lang)}`,
+    ];
 
-    if (outFmt === 'json') {
-        return `Du bist ein ${role}.\n\nAufgabe: ${input}\n\nAntworte ausschließlich im folgenden JSON-Format:\n\`\`\`json\n{\n  "zusammenfassung": "Kurze Zusammenfassung in 2-3 Sätzen",\n  "hauptpunkte": [\n    { "punkt": "...", "detail": "..." }\n  ],\n  "empfehlungen": ["...", "..."],\n  "naechste_schritte": ["...", "..."]\n}\n\`\`\`\n\nSprache: ${outLang}\nDetailtiefe: ${depth}`;
-    }
-
-    // Fließtext
-    return `Du bist ein ${role}.\n\nAufgabe: ${input}\n\nAnforderungen:\n- ${depth}\n- Ausgabesprache: ${outLang}\n- Beginne direkt mit dem Inhalt, ohne lange Einleitung\n- Schließe mit konkreten Empfehlungen oder nächsten Schritten ab`;
+    return sections.filter(Boolean).join('\n');
 }
 
 function bild(input, tool, style, lang) {
@@ -652,36 +847,43 @@ function text(input, tool, tone, lang) {
     const audience  = val('audience')  || 'allgemein';
     const outputFmt = val('outputFmt') || 'plain';
 
-    const toneMap = {professionell:'professionell und sachlich',kreativ:'kreativ und einzigartig',informell:'locker und informell',akademisch:'akademisch und präzise',marketing:'überzeugend und mehrwertstiftend',humorvoll:'humorvoll und unterhaltsam',inspirierend:'inspirierend und motivierend'};
-    const fmtMap  = {fliesstext:'als zusammenhängenden Fließtext',aufzaehlung:'als übersichtliche Aufzählung (Bullet Points)',tabelle:'als strukturierte Tabelle',faq:'im FAQ-Format (Fragen & Antworten)',schritt:'als nummerierte Schritt-für-Schritt-Anleitung'};
-    const lenMap  = {kurz:'kurz und prägnant (ca. 1-2 Absätze)',mittel:'mittel (ca. 3-5 Absätze)',lang:'ausführlich und detailliert'};
-    const audMap  = {allgemein:'ein allgemeines Publikum',experten:'Fachexperten',einsteiger:'Einsteiger ohne Vorkenntnisse',geschaeft:'Geschäftsleute und Entscheidungsträger',jugend:'Jugendliche'};
+    const toneMap = {professionell:'professionell, sachlich und kompetent',kreativ:'kreativ, einzigartig und überraschend',informell:'locker und nahbar, wie ein Gespräch unter Freunden',akademisch:'akademisch, präzise und wissenschaftlich fundiert',marketing:'überzeugend, mehrwertstiftend mit klarem Nutzenversprechen',humorvoll:'humorvoll und unterhaltsam, mit einem Augenzwinkern',inspirierend:'inspirierend, motivierend und handlungsanregend'};
+    const fmtMap  = {fliesstext:'zusammenhängenden Fließtext mit klaren Absätzen',aufzaehlung:'übersichtliche Aufzählung mit Bullet Points und kurzen Erklärungen',tabelle:'strukturierte Tabelle mit beschrifteten Spalten',faq:'FAQ-Format mit präzisen Fragen und ausführlichen Antworten',schritt:'nummerierte Schritt-für-Schritt-Anleitung mit Erklärung je Schritt'};
+    const lenMap  = {kurz:'kurz und prägnant (ca. 150-300 Wörter)',mittel:'mittel (ca. 400-800 Wörter)',lang:'ausführlich und umfassend (1000+ Wörter)'};
+    const audMap  = {allgemein:'ein allgemeines Publikum ohne Vorkenntnisse',experten:'Fachexperten – setze Grundwissen voraus, fokussiere auf Tiefe',einsteiger:'absolute Einsteiger – erkläre Fachbegriffe, verwende Analogien',geschaeft:'Geschäftsleute – fokussiere auf ROI, Effizienz und Umsetzbarkeit',jugend:'Jugendliche – zeitgemäße Sprache, praktische Beispiele'};
     const outLang = lang === 'en' ? 'Englisch' : 'Deutsch';
     const role    = detectRole(input);
 
-    const fmtInstruction = outputFmt === 'markdown'
-        ? '- **Ausgabeformat:** Markdown – verwende `##` Überschriften, **Fettdruck** und Bullet Points'
-        : outputFmt === 'json'
-        ? '- **Ausgabeformat:** JSON – strukturiere die Ausgabe als valides JSON-Objekt'
-        : '- **Ausgabeformat:** Fließtext ohne Sonderformatierung';
+    return `# Rolle
+Du bist ein ${role} mit langjähriger Berufserfahrung. Du schreibst klar, zielgruppengerecht und wirkungsvoll.
 
-    return `Du bist ein ${role}.
+# Aufgabe
+${input}
 
-Aufgabe: ${input}
+# Vorgaben
+- **Ton:** ${toneMap[tone] || 'professionell'}
+- **Textformat:** ${fmtMap[format] || 'Fließtext'}
+- **Länge:** ${lenMap[length] || 'mittel'}
+- **Zielgruppe:** ${audMap[audience] || 'allgemeines Publikum'}
+- **Ausgabesprache:** ${outLang}
+${formatBlock(outputFmt, lang)}
 
-Anforderungen:
-- Ton: ${toneMap[tone] || 'professionell'}
-- Format: ${fmtMap[format] || 'Fließtext'}
-- Länge: ${lenMap[length] || 'mittel'}
-- Zielgruppe: ${audMap[audience] || 'allgemeines Publikum'}
-- Ausgabesprache: ${outLang}
-${fmtInstruction}
+# Dein Vorgehen
+1. **Analysiere** die Aufgabe: Was ist die Kernbotschaft? Wer liest den Text?
+2. **Strukturiere** den Text logisch – das Wichtigste zuerst
+3. **Schreibe** in dem gewünschten Ton, konsistent vom ersten bis zum letzten Satz
+4. **Prüfe** den Text auf Verständlichkeit, Redundanzen und Tonbrüche
 
-Stelle sicher, dass der Text:
-✓ Den Kerninhalt klar und verständlich vermittelt
-✓ Keine unnötigen Füllwörter enthält
-✓ Den gewünschten Ton durchgehend beibehält
-✓ Direkt – ohne lange Einleitung – mit dem Inhalt beginnt`;
+${qualityRules(lang)}
+
+# Textqualität
+- ✓ Beginne mit einem starken Einstieg, der sofort Interesse weckt
+- ✓ Jeder Absatz hat genau EINE klare Kernaussage
+- ✓ Vermeide Füllwörter, Phrasen und unnötige Wiederholungen
+- ✓ Halte den gewünschten Ton durchgehend konsistent
+- ✓ Schließe mit einer klaren Handlungsaufforderung oder Zusammenfassung
+
+${selfImproveBlock(lang)}`;
 }
 
 function code(input, tool, quality, lang) {
@@ -689,28 +891,46 @@ function code(input, tool, quality, lang) {
     const comments  = val('codeComments')  || 'detailliert';
 
     const langNames = {python:'Python',javascript:'JavaScript',typescript:'TypeScript',java:'Java',csharp:'C#',cpp:'C++',go:'Go',rust:'Rust',swift:'Swift',php:'PHP',andere:'der passenden Sprache'};
-    const qualMap   = {clean:'sauber nach Clean-Code-Prinzipien',performance:'performance-optimiert',beginner:'anfängerfreundlich und einfach verständlich',documented:'umfassend dokumentiert',minimal:'minimal und kompakt'};
-    const commMap   = {detailliert:'Jede Funktion und komplexe Logik ausführlich kommentieren',minimal:'Nur kritische Stellen kommentieren',keine:'Keine Kommentare'};
+    const qualMap   = {clean:'sauber nach Clean-Code-Prinzipien (SOLID, DRY, KISS)',performance:'performance-optimiert mit Fokus auf Laufzeit und Speicher',beginner:'anfängerfreundlich – jeder Schritt erklärt, einfache Strukturen',documented:'umfassend dokumentiert mit Docstrings und Inline-Kommentaren',minimal:'minimal und kompakt – so wenig Code wie möglich, so viel wie nötig'};
+    const commMap   = {detailliert:'Jede Funktion und komplexe Logik ausführlich kommentieren',minimal:'Nur kritische oder nicht-offensichtliche Stellen kommentieren',keine:'Keine Kommentare im Code'};
     const outLang   = lang === 'en' ? 'English' : 'Deutsch';
 
-    return `Du bist ein erfahrener ${langNames[codeLang] || 'Software'}-Entwickler.
+    return `# Rolle
+Du bist ein Senior ${langNames[codeLang] || 'Software'}-Entwickler mit 10+ Jahren Erfahrung in produktiven Systemen.
 
-Aufgabe: ${input}
+# Aufgabe
+${input}
 
-Technische Anforderungen:
-- Programmiersprache: ${langNames[codeLang] || codeLang}
-- Code-Qualität: ${qualMap[quality] || 'sauber und wartbar'}
-- Kommentare: ${commMap[comments]}
-- Fehlerbehandlung: Robuste Fehlerbehandlung implementieren
-- Best Practices: Branchenübliche Standards einhalten
+# Dein Vorgehen — Denke Schritt für Schritt
+1. **Anforderung verstehen**: Was genau soll der Code tun? Welche Ein-/Ausgaben gibt es?
+2. **Architektur planen**: Welche Datenstrukturen, Patterns und Module sind optimal?
+3. **Implementieren**: Schreibe den Code ${qualMap[quality] || 'sauber und wartbar'}
+4. **Edge Cases bedenken**: Welche Grenzfälle und Fehlerszenarien müssen abgefangen werden?
+5. **Testen**: Ist der Code korrekt? Würde er ein Code-Review bestehen?
 
-Liefere:
-1. Vollständigen, direkt ausführbaren Code
-2. Kurze Erklärung des Ansatzes (3-5 Sätze)
-3. Verwendungsbeispiel mit konkreten Werten
-4. Hinweise auf mögliche Erweiterungen
+# Technische Anforderungen
+- **Programmiersprache:** ${langNames[codeLang] || codeLang}
+- **Code-Qualität:** ${qualMap[quality] || 'sauber und wartbar'}
+- **Kommentare:** ${commMap[comments]}
+- **Fehlerbehandlung:** Robuste Validierung und aussagekräftige Fehlermeldungen
+- **Sicherheit:** Keine bekannten Schwachstellen (Injection, unsichere Defaults etc.)
 
-Antworte auf ${outLang}.`;
+# Qualitätsregeln
+- ❌ Kein Pseudo-Code — nur vollständigen, direkt ausführbaren Code liefern
+- ❌ Keine veralteten oder deprecated Funktionen verwenden
+- ❌ Keine hardcodierten Secrets oder Credentials im Code
+- ✅ Aktuelle Best Practices und Konventionen für ${langNames[codeLang] || 'die Sprache'} einhalten
+- ✅ Wenn mehrere Lösungsansätze existieren, den besten wählen und kurz begründen
+
+# Gewünschte Ausgabe
+1. **Vollständiger Code** — direkt ausführbar, in einem Code-Block
+2. **Erklärung** — Lösungsansatz in 3-5 Sätzen (warum dieser Ansatz?)
+3. **Verwendungsbeispiel** — konkretes Beispiel mit realistischen Werten
+4. **Hinweise** — mögliche Erweiterungen, Limitierungen oder Optimierungen
+
+Antworte auf ${outLang}.
+
+${selfImproveBlock(lang)}`;
 }
 
 function social(input, tool, tone, lang) {
@@ -719,96 +939,145 @@ function social(input, tool, tone, lang) {
     const emojis   = val('emojis')   || 'ja';
 
     const platCfg = {
-        instagram:{name:'Instagram',   limit:'2.200',   tip:'Hook im ersten Satz, visuell beschreibend'},
-        linkedin: {name:'LinkedIn',    limit:'3.000',   tip:'Professionell, persönliche Erfahrungen, Mehrwert'},
-        twitter:  {name:'Twitter / X', limit:'280',     tip:'Kurz, prägnant, meinungsstark'},
-        tiktok:   {name:'TikTok',      limit:'2.200',   tip:'Energetisch, Trend-bewusst, Duet/Stitch-CTA'},
-        facebook: {name:'Facebook',    limit:'63.000',  tip:'Community-orientiert, zum Teilen animierend'},
-        youtube:  {name:'YouTube',     limit:'5.000',   tip:'Community-Engagement, Teaser für Inhalte'},
+        instagram:{name:'Instagram',   limit:'2.200',   tip:'Visuell denken. Erste Zeile = Hook (wird im Feed abgeschnitten). Absätze mit Leerzeilen. Carousel-Posts performen besonders gut.'},
+        linkedin: {name:'LinkedIn',    limit:'3.000',   tip:'Persönliche Erfahrung + Lernerkenntnis. Erste 2 Zeilen entscheiden über „Mehr anzeigen". Listenformate und kurze Absätze performen gut.'},
+        twitter:  {name:'Twitter / X', limit:'280',     tip:'Max. 280 Zeichen. Meinungsstark, prägnant. Threads für längere Inhalte. Fragen erzeugen Engagement.'},
+        tiktok:   {name:'TikTok',      limit:'2.200',   tip:'Schnell, energetisch, trendorientiert. Sprich die Community direkt an. CTAs für Duet/Stitch/Kommentare.'},
+        facebook: {name:'Facebook',    limit:'63.000',  tip:'Community-orientiert, Fragen stellen, zum Teilen animieren. Persönliche Stories funktionieren besser als Werbe-Posts.'},
+        youtube:  {name:'YouTube',     limit:'5.000',   tip:'Community-Tab: kurz, interaktiv, Umfragen. Teaser für kommende Videos. Backstage-Einblicke.'},
     };
-    const toneMap = {inspirierend:'inspirierend und motivierend',informativ:'informativ und mehrwertstiftend',humorvoll:'humorvoll und unterhaltsam',werbend:'überzeugend mit klarem Call-to-Action',storytelling:'als persönliches Erlebnis (Storytelling)'};
+    const toneMap = {inspirierend:'inspirierend und motivierend — der Leser soll sich empowered fühlen',informativ:'informativ und mehrwertstiftend — der Leser lernt etwas Konkretes',humorvoll:'humorvoll und unterhaltsam — mit Witz, aber ohne den Markenkern zu verwässern',werbend:'überzeugend mit klarem Nutzenversprechen und Call-to-Action',storytelling:'als persönliches Mini-Erlebnis mit Spannungsbogen (Problem → Erkenntnis → Lösung)'};
     const pc = platCfg[platform] || platCfg.instagram;
     const outLang = lang === 'en' ? 'Englisch' : 'Deutsch';
 
-    return `Du bist ein erfahrener Social-Media-Manager, spezialisiert auf ${pc.name}.
+    return `# Rolle
+Du bist ein erfahrener Social-Media-Stratege mit nachweisbarem Erfolg auf ${pc.name}. Du verstehst den Algorithmus und weißt, welche Formate Reichweite und Engagement erzeugen.
 
-Erstelle einen ${pc.name}-Post über:
-"${input}"
+# Aufgabe
+Erstelle einen ${pc.name}-Post über: "${input}"
 
-Anforderungen:
-- Ton: ${toneMap[tone] || 'ansprechend'}
-- Plattform-Hinweis: ${pc.tip}
-- Zeichenlimit: max. ${pc.limit} Zeichen
-- Hashtags: ${hashtags === 'ja' ? '5-10 relevante Hashtags am Ende' : 'Keine Hashtags'}
-- Emojis: ${emojis === 'ja' ? 'Passende Emojis strategisch einsetzen' : 'Keine Emojis'}
-- Sprache: ${outLang}
+# Dein Vorgehen — Denke Schritt für Schritt
+1. **Zielgruppe verstehen**: Wer scrollt durch ${pc.name}? Was stoppt den Daumen?
+2. **Hook formulieren**: Die erste Zeile muss sofort Neugier, Emotion oder Identifikation auslösen
+3. **Kernbotschaft**: Genau EIN klarer Gedanke oder Mehrwert pro Post
+4. **CTA planen**: Was soll der Leser TUN? (Kommentieren, Speichern, Teilen, Klicken)
 
-Der Post soll:
-✓ Mit einem starken Hook beginnen
-✓ Den Leser emotional ansprechen oder Mehrwert bieten
-✓ Mit einem klaren Call-to-Action enden
+# Plattform-Spezifisch
+- **Plattform:** ${pc.name}
+- **Zeichenlimit:** max. ${pc.limit} Zeichen
+- **Plattform-Tipps:** ${pc.tip}
 
-Nur den fertigen Post-Text ausgeben, ohne Erklärungen.`;
+# Stil & Format
+- **Ton:** ${toneMap[tone] || 'ansprechend und authentisch'}
+- **Hashtags:** ${hashtags === 'ja' ? '5-10 relevante Hashtags (Mix aus Nische + Reichweite) am Ende' : 'Keine Hashtags'}
+- **Emojis:** ${emojis === 'ja' ? 'Strategisch einsetzen – als visuelle Ankerpunkte, nicht inflationär' : 'Keine Emojis verwenden'}
+- **Sprache:** ${outLang}
+
+# Qualitätscheck
+- ✓ Hook in den ersten 5-8 Wörtern, die zum Weiterlesen zwingen
+- ✓ Absätze kurz halten (max. 2-3 Zeilen), Leerzeilen als Pausen
+- ✓ Authentisch klingen, NICHT wie ein Marketing-Template
+- ✓ Klarer Call-to-Action am Ende
+
+Liefere NUR den fertigen Post-Text (bereit zum Kopieren), ohne Erklärungen drum herum.
+
+${selfImproveBlock(lang)}`;
 }
 
 function email(input, tool, tone, lang) {
     const recipient = val('recipient') || 'kollege';
     const emailLen  = val('emailLen')  || 'mittel';
 
-    const recMap  = {chef:'Vorgesetzten / Chef',kollege:'Kollegen',kunde:'Kunden oder Geschäftspartner',unbekannt:'unbekannte Person (formell)',team:'Team oder Gruppe'};
-    const lenMap  = {kurz:'kurz und prägnant (max. 3-4 Sätze im Hauptteil)',mittel:'mittel (2-3 kurze Absätze)',ausfuehrlich:'ausführlich mit allen relevanten Details'};
-    const toneMap = {formell:'formell und geschäftsmäßig',freundlich:'freundlich und kollegial',direkt:'direkt und auf den Punkt',ueberzeugend:'überzeugend und argumentativ',empathisch:'empathisch und verständnisvoll'};
+    const recMap  = {chef:'einen Vorgesetzten / Chef – respektvoll, aber selbstbewusst',kollege:'einen Kollegen – kollegial und auf Augenhöhe',kunde:'einen Kunden oder Geschäftspartner – professionell mit Fokus auf Mehrwert',unbekannt:'eine bisher unbekannte Person – formell mit kurzem Kontext zur eigenen Person',team:'ein Team oder eine Gruppe – inklusiv, klar und handlungsorientiert'};
+    const lenMap  = {kurz:'kurz und prägnant (max. 3-4 Sätze im Hauptteil)',mittel:'mittel (2-3 kurze Absätze)',ausfuehrlich:'ausführlich mit allen relevanten Details und Hintergrund'};
+    const toneMap = {formell:'formell und geschäftsmäßig',freundlich:'freundlich, warmherzig und kollegial',direkt:'direkt, knapp und handlungsorientiert',ueberzeugend:'überzeugend und argumentativ – mit klarem Nutzen für den Empfänger',empathisch:'empathisch, verständnisvoll und wertschätzend'};
     const outLang = lang === 'en' ? 'Englisch' : 'Deutsch';
 
-    return `Du bist ein professioneller Business-Kommunikator.
+    return `# Rolle
+Du bist ein erfahrener Business-Kommunikator, der E-Mails schreibt, die gelesen, verstanden und beantwortet werden.
 
-Inhalt der E-Mail: "${input}"
+# Aufgabe
+Verfasse eine E-Mail mit folgendem Inhalt: "${input}"
 
-Rahmenbedingungen:
-- Empfänger: ${recMap[recipient] || 'Kollegen'}
-- Ton: ${toneMap[tone] || 'professionell'}
-- Länge: ${lenMap[emailLen] || 'mittel'}
-- Sprache: ${outLang}
+# Dein Vorgehen — Denke Schritt für Schritt
+1. **Ziel identifizieren**: Was soll der Empfänger nach dem Lesen TUN oder WISSEN?
+2. **Empfänger-Perspektive**: Was ist für den Empfänger relevant? Was könnte Fragen aufwerfen?
+3. **Struktur planen**: Betreff → Anrede → Kontext → Kernaussage → Handlungsaufforderung → Abschluss
+4. **Prüfen**: Ist die E-Mail klar, höflich und frei von Missverständnissen?
 
-Struktur:
-1. Betreff: Aussagekräftig, max. 60 Zeichen
-2. Anrede: Passend zum Empfänger
-3. Hauptteil: ${lenMap[emailLen]}
-4. Abschluss: Höfliche Schlussformel
-5. Signatur: Platzhalter [Name], [Position], [Unternehmen]
+# Rahmenbedingungen
+- **Empfänger:** ${recMap[recipient] || 'Kollegen'}
+- **Ton:** ${toneMap[tone] || 'professionell'}
+- **Länge:** ${lenMap[emailLen] || 'mittel'}
+- **Sprache:** ${outLang}
 
-Nur die fertige E-Mail ausgeben, ohne zusätzliche Kommentare.`;
+# E-Mail-Struktur
+1. **Betreff:** Aussagekräftig und konkret (max. 60 Zeichen) – der Empfänger muss sofort wissen, worum es geht
+2. **Anrede:** Passend zum Empfänger und zur Beziehung
+3. **Einstieg:** Kurzer Kontext (1 Satz) – warum schreibst du?
+4. **Hauptteil:** Kerninhalt, ${lenMap[emailLen]}
+5. **Handlungsaufforderung:** Was ist der nächste Schritt? Bis wann?
+6. **Abschluss:** Höfliche Schlussformel
+7. **Signatur:** [Name] · [Position] · [Unternehmen]
+
+# Qualitätsregeln
+- ✓ Ein Absatz = ein Gedanke (max. 3-4 Zeilen pro Absatz)
+- ✓ Klare Handlungsaufforderung — der Empfänger weiß, was er tun soll
+- ✓ Professionell aber nicht steif — authentisch klingen
+- ❌ Keine Floskeln wie „hiermit möchte ich..." oder „ich hoffe, es geht Ihnen gut..."
+- ❌ Kein passiv-aggressiver Unterton
+
+Liefere NUR die fertige E-Mail (Betreff bis Signatur), bereit zum Kopieren.
+
+${selfImproveBlock(lang)}`;
 }
 
 function praesentation(input, tool, style, lang) {
     const slides  = val('slides')  || '10';
     const presAud = val('presAud') || 'allgemein';
 
-    const audMap   = {management:'Management/Führungskräfte (Fokus auf ROI und Entscheidungen)',team:'eigenes Team (kollegial, detailliert)',kunden:'Kunden/Investoren (überzeugend, Mehrwert)',studenten:'Studenten/Schüler (lehrreich, klar)',allgemein:'allgemeines Publikum'};
-    const styleMap = {professionell:'professionell und sachlich',kreativ:'kreativ und visuell ansprechend',akademisch:'akademisch und evidenzbasiert',pitch:'überzeugenden Sales-Pitch',storytelling:'Storytelling-Format'};
+    const audMap   = {management:'Management/Führungskräfte — sie wollen Zahlen, ROI, Risiken und Entscheidungsgrundlagen',team:'das eigene Team — kollegial, detailliert, mit klaren nächsten Schritten',kunden:'Kunden/Investoren — überzeugend, nutzenorientiert, mit Proof Points',studenten:'Studenten/Schüler — lehrreich, anschaulich, mit Praxisbeispielen',allgemein:'ein allgemeines Publikum — zugänglich, keine Fachbegriffe voraussetzen'};
+    const styleMap = {professionell:'professionell und sachlich — klare Struktur, Fakten im Vordergrund',kreativ:'kreativ und visuell ansprechend — überraschende Einstiege, starke Bilder',akademisch:'akademisch und evidenzbasiert — Quellen, Daten und logische Herleitung',pitch:'überzeugender Sales-Pitch — Problem → Lösung → Nutzen → Beweis → CTA',storytelling:'Storytelling — ein roter Faden, der Spannung aufbaut und emotional verbindet'};
     const outLang  = lang === 'en' ? 'Englisch' : 'Deutsch';
 
-    return `Du bist ein erfahrener Präsentationsexperte.
+    return `# Rolle
+Du bist ein erfahrener Präsentationsberater und Storytelling-Experte. Du entwirfst Präsentationen, die informieren, überzeugen und im Gedächtnis bleiben.
 
-Thema: "${input}"
+# Aufgabe
+Erstelle eine vollständige Präsentationsstruktur zum Thema: "${input}"
 
-Rahmenbedingungen:
-- Stil: ${styleMap[style] || 'professionell'}
-- Anzahl Folien: ${slides}
-- Zielgruppe: ${audMap[presAud] || 'allgemeines Publikum'}
-- Sprache: ${outLang}
+# Dein Vorgehen — Denke Schritt für Schritt
+1. **Kernbotschaft definieren**: Was ist die EINE zentrale Aussage, die das Publikum mitnehmen soll?
+2. **Zielgruppe analysieren**: Was weiß das Publikum bereits? Was braucht es, um überzeugt zu werden?
+3. **Storyline planen**: Welcher rote Faden zieht sich durch alle Folien?
+4. **Folien strukturieren**: Jede Folie = ein Gedanke, logisch aufeinander aufbauend
+5. **Prüfen**: Ist die Dramaturgie stimmig? Gibt es einen starken Anfang UND ein starkes Ende?
 
-Erstelle für jede Folie:
-• Folientitel (kurz und prägnant)
-• Kerninhalt (3-5 Bullet Points)
-• Visualisierungsvorschlag
+# Rahmenbedingungen
+- **Stil:** ${styleMap[style] || 'professionell'}
+- **Anzahl Folien:** ${slides}
+- **Zielgruppe:** ${audMap[presAud] || 'allgemeines Publikum'}
+- **Sprache:** ${outLang}
 
-Zusätzlich:
-- Packende Eröffnungsfolie
-- Kernbotschaft der gesamten Präsentation
-- Starke Abschlussfolie mit Call-to-Action
+# Erwartete Ausgabe
+Liefere zuerst:
+- **Kernbotschaft** der gesamten Präsentation (1 Satz)
+- **Storyline** — der rote Faden in 2-3 Sätzen
 
-Antworte auf ${outLang}.`;
+Dann für JEDE Folie:
+- **Folientitel** (kurz, prägnant, aktivierend)
+- **Kerninhalt** (3-5 Bullet Points — was auf der Folie steht)
+- **Sprechernotiz** (was der Vortragende dazu SAGT — 2-3 Sätze)
+- **Visualisierung** (konkreter Vorschlag: Diagramm, Bild, Icon, Zitat etc.)
+
+# Qualitätsregeln
+- ✓ Folie 1 muss sofort Aufmerksamkeit erzeugen (Frage, Provokation, Statistik)
+- ✓ Max. 6-7 Wörter pro Bullet Point — die Folie ist NICHT das Script
+- ✓ Logischer Aufbau: jede Folie baut auf der vorherigen auf
+- ✓ Letzte Folie: starker Abschluss mit Call-to-Action oder prägnanter Zusammenfassung
+- ❌ Keine Textwände — Präsentationen sind visuell, nicht Dokumente
+
+${selfImproveBlock(lang)}`;
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
